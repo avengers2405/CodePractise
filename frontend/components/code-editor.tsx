@@ -16,32 +16,10 @@ interface CodeEditorProps {
 }
 
 const languageTemplates: Record<Language, string> = {
-  cpp: `class Solution {
-public:
-    string minWindow(string s, string t) {
-        // Write your solution here
-        
-    }
-};`,
-  python: `class Solution:
-    def minWindow(self, s: str, t: str) -> str:
-        # Write your solution here
-        pass`,
-  java: `class Solution {
-    public String minWindow(String s, String t) {
-        // Write your solution here
-        
-    }
-}`,
-  javascript: `/**
- * @param {string} s
- * @param {string} t
- * @return {string}
- */
-var minWindow = function(s, t) {
-    // Write your solution here
-    
-};`,
+  cpp: ``,
+  python: ``,
+  java: ``,
+  javascript: ``,
 }
 
 const languageNames: Record<Language, string> = {
@@ -121,18 +99,9 @@ export function CodeEditor({ onCodeChange, onLanguageChange, initialLanguage = "
       {/* Editor Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
         <div className="flex items-center gap-3">
-          <Select value={language} onValueChange={handleLanguageChange}>
-            <SelectTrigger className="w-32 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(languageNames).map(([key, name]) => (
-                <SelectItem key={key} value={key}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="px-3 py-1 bg-muted/40 rounded text-sm text-muted-foreground border border-border/50">
+            {languageNames[language]}
+          </div>
           <span className="text-xs text-muted-foreground">Auto</span>
         </div>
 

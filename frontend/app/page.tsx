@@ -233,19 +233,6 @@ export default function HomePage() {
             <div className="flex flex-col h-full p-4">
               <div className="flex items-center justify-between mb-3 px-3 py-2 bg-card/80 rounded-t-lg border border-border shadow-sm">
                 <h3 className="font-medium text-sm">Code Editor</h3>
-                <div className="flex gap-2 items-center">
-                  <span className="text-xs text-muted-foreground">Language:</span>
-                  <select 
-                    value={currentLanguage}
-                    onChange={(e) => setCurrentLanguage(e.target.value as any)}
-                    className="text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="cpp">C++</option>
-                    <option value="python">Python</option>
-                    <option value="java">Java</option>
-                    <option value="javascript">JavaScript</option>
-                  </select>
-                </div>
               </div>
               
               <div className="flex-1 rounded-b-lg overflow-hidden shadow-lg border border-border border-t-0 bg-white dark:bg-slate-900">
