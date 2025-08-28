@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Play, BarChart3, CheckCircle, XCircle, TimerIcon } from "lucide-react"
 import { ProblemDisplay } from "@/components/problem-display"
@@ -48,6 +48,9 @@ export default function HomePage() {
   const [currentCode, setCurrentCode] = useState("")
   const [currentLanguage, setCurrentLanguage] = useState<"cpp" | "python" | "java" | "javascript">("cpp")
   const [solvedCount, setSolvedCount] = useState(0)
+  const [splitRatio, setSplitRatio] = useState(50) // 50% split initially
+  const isDraggingRef = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const { currentTime, totalTime, formatTime, resetCurrentTimer } = useTimer()
 
@@ -56,6 +59,35 @@ export default function HomePage() {
   useEffect(() => {
     resetCurrentTimer()
   }, [currentProblemIndex])
+
+  const handleMouseDown = () => {
+    isDraggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleMouseMove = (e: globalThis.MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return
+    
+    const container = containerRef.current
+    const containerRect = container.getBoundingClientRect()
+    const newRatio = ((e.clientX - containerRect.left) / containerRect.width) * 100
+    
+    const constrainedRatio = Math.min(Math.max(newRatio, 10), 90)
+    setSplitRatio(constrainedRatio)
+  }
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false
+    document.body.style.cursor = 'default'
+    document.body.style.userSelect = ''
+    
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }
 
   const handleSubmit = () => {
     if (!currentCode.trim()) {
@@ -181,16 +213,49 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <div className="w-1/2 border-r border-border">
+        <div className="flex flex-1 overflow-hidden" ref={containerRef}>
+          <div 
+            className="border-r border-border overflow-auto bg-card/80" 
+            style={{ width: `${splitRatio}%` }}
+          >
             <ProblemDisplay problem={currentProblem} />
           </div>
-          <div className="w-1/2 flex flex-col">
-            <CodeEditor
-              onCodeChange={setCurrentCode}
-              onLanguageChange={setCurrentLanguage}
-              initialLanguage={currentLanguage}
-            />
+          
+          <div 
+            className="w-1 hover:w-2 bg-border hover:bg-primary cursor-col-resize flex-shrink-0 transition-colors"
+            onMouseDown={handleMouseDown}
+          />
+          
+          <div 
+            className="flex flex-col overflow-auto" 
+            style={{ width: `${100 - splitRatio}%` }}
+          >
+            <div className="flex flex-col h-full p-4">
+              <div className="flex items-center justify-between mb-3 px-3 py-2 bg-card/80 rounded-t-lg border border-border shadow-sm">
+                <h3 className="font-medium text-sm">Code Editor</h3>
+                <div className="flex gap-2 items-center">
+                  <span className="text-xs text-muted-foreground">Language:</span>
+                  <select 
+                    value={currentLanguage}
+                    onChange={(e) => setCurrentLanguage(e.target.value as any)}
+                    className="text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="cpp">C++</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="javascript">JavaScript</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex-1 rounded-b-lg overflow-hidden shadow-lg border border-border border-t-0 bg-white dark:bg-slate-900">
+                <CodeEditor
+                  onCodeChange={setCurrentCode}
+                  onLanguageChange={setCurrentLanguage}
+                  initialLanguage={currentLanguage}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
