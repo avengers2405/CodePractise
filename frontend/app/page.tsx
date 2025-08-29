@@ -2,48 +2,29 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Play, BarChart3, CheckCircle, XCircle, TimerIcon } from "lucide-react"
+import { Play, BarChart3, CheckCircle, XCircle, TimerIcon, Loader2 } from "lucide-react"
 import { ProblemDisplay } from "@/components/problem-display"
 import { CodeEditor } from "@/components/code-editor"
 import { useTimer } from "@/hooks/use-timer"
 
-// Simple problem data
-const problems = [
-  {
-    id: 1,
-    title: "Minimum Window Substring",
-    difficulty: "Hard" as const,
-    description:
-      'Given two strings s and t of lengths m and n respectively, return the minimum window substring of s such that every character in t (including duplicates) is included in the window. If there is no such substring, return the empty string "".',
-    examples: [
-      {
-        input: 's = "ADOBECODEBANC", t = "ABC"',
-        output: '"BANC"',
-        explanation: "The minimum window substring \"BANC\" includes 'A', 'B', and 'C' from string t.",
-      },
-    ],
-    constraints: ["m == s.length", "n == t.length", "1 <= m, n <= 10^5"],
-  },
-  {
-    id: 2,
-    title: "Two Sum",
-    difficulty: "Easy" as const,
-    description:
-      "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-    examples: [
-      {
-        input: "nums = [2,7,11,15], target = 9",
-        output: "[0,1]",
-        explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
-      },
-    ],
-    constraints: ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9", "-10^9 <= target <= 10^9"],
-  },
-]
+// Define problem type for TypeScript
+interface Problem {
+  id: number
+  title: string
+  difficulty: "Easy" | "Medium" | "Hard"
+  description: string
+  examples: Array<{
+    input: string
+    output: string
+    explanation?: string
+  }>
+  constraints: string[]
+}
 
 export default function HomePage() {
   const [currentView, setCurrentView] = useState<"coding" | "analysis">("coding")
-  const [currentProblemIndex, setCurrentProblemIndex] = useState(0)
+  const [currentProblem, setCurrentProblem] = useState<Problem | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [submissionResult, setSubmissionResult] = useState<string | null>(null)
   const [currentCode, setCurrentCode] = useState("")
   const [currentLanguage, setCurrentLanguage] = useState<"cpp" | "python" | "java" | "javascript">("cpp")
@@ -54,11 +35,33 @@ export default function HomePage() {
 
   const { currentTime, totalTime, formatTime, resetCurrentTimer } = useTimer()
 
-  const currentProblem = problems[currentProblemIndex]
-
+  // Fetch the first problem when the component mounts
   useEffect(() => {
-    resetCurrentTimer()
-  }, [currentProblemIndex])
+    fetchProblem(1)
+  }, [])
+
+  // Fetch a problem by ID
+  const fetchProblem = async (id: number) => {
+    try {
+      setIsLoading(true)
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/problems/${id}`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch problem: ${response.statusText}`)
+      }
+      
+      const problem = await response.json()
+      setCurrentProblem(problem)
+      setCurrentCode("")  // Clear the code editor
+      setSubmissionResult(null)  // Reset submission status
+      resetCurrentTimer()  // Reset the timer for this problem
+    } catch (error) {
+      console.error("Error fetching problem:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleMouseDown = () => {
     isDraggingRef.current = true
@@ -89,28 +92,53 @@ export default function HomePage() {
     document.removeEventListener('mouseup', handleMouseUp)
   }
 
-  const handleSubmit = () => {
-    if (!currentCode.trim()) {
+  const handleSubmit = async () => {
+    if (!currentCode.trim() || !currentProblem) {
       setSubmissionResult("error")
       return
     }
 
-    const isCorrect = Math.random() > 0.5
-    setSubmissionResult(isCorrect ? "correct" : "wrong")
+    try {
+      // Show loading state
+      setSubmissionResult("loading")
+      
+      // Send code to backend for evaluation
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/submission`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          problemId: currentProblem.id,
+          code: currentCode,
+          language: currentLanguage
+        }),
+      })
 
-    if (isCorrect) {
-      setSolvedCount((s) => s + 1)
-      setTimeout(() => {
-        if (currentProblemIndex < problems.length - 1) {
-          setCurrentProblemIndex(currentProblemIndex + 1)
-          setCurrentCode("")
-          setSubmissionResult(null)
-        }
-      }, 2000)
+      if (!response.ok) {
+        throw new Error('Submission failed')
+      }
+
+      const result = await response.json()
+      setSubmissionResult(result.status) // "Accepted", "Wrong Answer", etc.
+
+      if (result.status === "Accepted") {
+        setSolvedCount((s) => s + 1)
+        
+        // Fetch next problem after a delay
+        setTimeout(() => {
+          // Get the next problem ID by incrementing current ID
+          const nextProblemId = currentProblem.id + 1
+          fetchProblem(nextProblemId)
+        }, 2000)
+      }
+    } catch (error) {
+      console.error('Error submitting solution:', error)
+      setSubmissionResult("error")
     }
   }
 
-  const canViewAnalysis = solvedCount >= problems.length
+  const canViewAnalysis = solvedCount > 0
 
   if (currentView === "analysis") {
     return (
@@ -207,57 +235,81 @@ export default function HomePage() {
       <div className="flex flex-col h-[calc(100vh-73px)]">
         <div className="px-6 py-4 border-b border-border bg-card">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              {currentProblem.id}. {currentProblem.title}
-            </h2>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <h2 className="text-lg font-semibold text-foreground">Loading problem...</h2>
+              </div>
+            ) : currentProblem ? (
+              <h2 className="text-lg font-semibold text-foreground">
+                {currentProblem.id}. {currentProblem.title}
+              </h2>
+            ) : (
+              <h2 className="text-lg font-semibold text-destructive">
+                No more problems available
+              </h2>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden" ref={containerRef}>
-          <div 
-            className="border-r border-border overflow-auto bg-card/80" 
-            style={{ width: `${splitRatio}%` }}
-          >
-            <ProblemDisplay problem={currentProblem} />
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-          
-          <div 
-            className="w-1 hover:w-2 bg-border hover:bg-primary cursor-col-resize flex-shrink-0 transition-colors"
-            onMouseDown={handleMouseDown}
-          />
-          
-          <div 
-            className="flex flex-col overflow-auto" 
-            style={{ width: `${100 - splitRatio}%` }}
-          >
-            <div className="flex flex-col h-full p-4">
-              <div className="flex items-center justify-between mb-3 px-3 py-2 bg-card/80 rounded-t-lg border border-border shadow-sm">
-                <h3 className="font-medium text-sm">Code Editor</h3>
-              </div>
-              
-              <div className="flex-1 rounded-b-lg overflow-hidden shadow-lg border border-border border-t-0 bg-white dark:bg-slate-900">
-                <CodeEditor
-                  onCodeChange={setCurrentCode}
-                  onLanguageChange={setCurrentLanguage}
-                  initialLanguage={currentLanguage}
-                />
+        ) : currentProblem ? (
+          <div className="flex flex-1 overflow-hidden" ref={containerRef}>
+            <div 
+              className="border-r border-border overflow-auto bg-card/80" 
+              style={{ width: `${splitRatio}%` }}
+            >
+              <ProblemDisplay problem={currentProblem} />
+            </div>
+            
+            <div 
+              className="w-1 hover:w-2 bg-border hover:bg-primary cursor-col-resize flex-shrink-0 transition-colors"
+              onMouseDown={handleMouseDown}
+            />
+            
+            <div 
+              className="flex flex-col overflow-auto" 
+              style={{ width: `${100 - splitRatio}%` }}
+            >
+              <div className="flex flex-col h-full p-4">
+                <div className="flex items-center justify-between mb-3 px-3 py-2 bg-card/80 rounded-t-lg border border-border shadow-sm">
+                  <h3 className="font-medium text-sm">Code Editor</h3>
+                </div>
+                
+                <div className="flex-1 rounded-b-lg overflow-hidden shadow-lg border border-border border-t-0 bg-white dark:bg-slate-900">
+                  <CodeEditor
+                    onCodeChange={setCurrentCode}
+                    onLanguageChange={setCurrentLanguage}
+                    initialLanguage={currentLanguage}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="max-w-md p-6 text-center">
+              <h3 className="text-xl font-bold mb-2">Congratulations!</h3>
+              <p>You've completed all the available problems.</p>
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-border bg-card px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {submissionResult && (
                 <div className="flex items-center gap-2">
-                  {submissionResult === "correct" && (
+                  {submissionResult === "Accepted" && (
                     <>
                       <CheckCircle className="h-5 w-5 text-primary" />
                       <span className="font-medium text-primary">Accepted! Moving to next problem...</span>
                     </>
                   )}
-                  {submissionResult === "wrong" && (
+                  {submissionResult === "Wrong Answer" && (
                     <>
                       <XCircle className="h-5 w-5 text-destructive" />
                       <span className="font-medium text-destructive">Wrong Answer</span>
@@ -269,11 +321,21 @@ export default function HomePage() {
                       <span className="font-medium text-destructive">Please write some code</span>
                     </>
                   )}
+                  {submissionResult === "loading" && (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span className="font-medium text-muted-foreground">Submitting...</span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
             <div className="flex gap-3">
-              <Button onClick={handleSubmit} className="bg-primary hover:bg-primary/90">
+              <Button 
+                onClick={handleSubmit} 
+                className="bg-primary hover:bg-primary/90"
+                disabled={isLoading || !currentProblem}
+              >
                 Submit Solution
               </Button>
             </div>
