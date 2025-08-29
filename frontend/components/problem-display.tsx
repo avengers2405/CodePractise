@@ -11,7 +11,6 @@ interface Example {
 interface Problem {
   id: number
   title: string
-  difficulty: "Easy" | "Medium" | "Hard"
   description: string
   examples: Example[]
   constraints: string[]
@@ -29,27 +28,13 @@ export function ProblemDisplay({ problem }: ProblemDisplayProps) {
   const companies = problem.companies ?? []
   const hasHint = problem.hasHint ?? false
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-primary/10 text-primary"
-      case "Medium":
-        return "bg-secondary/10 text-secondary-foreground"
-      case "Hard":
-        return "bg-destructive/10 text-destructive"
-      default:
-        return "bg-muted text-muted-foreground"
-    }
-  }
-
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-6 space-y-6">
         {/* Problem Header */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <Badge className={getDifficultyColor(problem.difficulty)}>{problem.difficulty}</Badge>
-
+            
             {topics.length > 0 && (
               <Badge variant="outline" className="gap-1">
                 <Clock className="h-3 w-3" />
