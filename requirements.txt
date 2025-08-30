@@ -1,0 +1,142 @@
+in each problem folder, there would be problem id which would be used to fetch problem from vjudge.
+to fetch PS from vjudge, sequence is:
+
+1)
+fetch("https://vjudge.net/problem/{{PROBLEM_ID}}", {
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "accept-language": "en-US,en;q=0.5",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=0, i",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-user": "?1",
+    "sec-gpc": "1",
+    "upgrade-insecure-requests": "1",
+    "cookie": "...",
+    "Referer": "https://vjudge.net/problem"
+  },
+  "body": null,
+  "method": "GET"
+});
+
+get -> 
+data-key="2671885837825933"
+data-version="1756475823000"
+title="<title>Composing Of String..."
+
+2)
+fetch("https://vjudge.net/problem/description/{{data-key}}?{{data-version}}", {
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "accept-language": "en-US,en;q=0.5",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=0, i",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "iframe",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-gpc": "1",
+    "upgrade-insecure-requests": "1",
+    "cookie": "...",
+    "Referer": "https://vjudge.net/problem/{{PROBLEM_ID}}"
+  },
+  "body": null,
+  "method": "GET"
+});
+
+get ->
+problem statement, input output format, constraints, sample test cases
+
+-- done getting ps.
+
+3) (optional) if boilerplate need for problem (if problem is complex and data structure needs to be isolated)
+
+fetch from database or the folder of problem
+
+-- on submission
+
+4) submit code
+fetch("https://vjudge.net/problem/submit/{{PROBLEM_ID}}", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.5",
+    "cache-control": "no-cache",
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "sec-gpc": "1",
+    "x-requested-with": "XMLHttpRequest",
+    "cookie": "...",
+    "Referer": "https://vjudge.net/problem/{{PROBLEM_ID}}"
+  },
+  "body": "method=0&language=CPython3&open=1&source=for+_+in+range(int(input()))%3A%0A++++n+%3D+int(input())%0A++++print(n%2B1)",
+  "method": "POST"
+});
+
+get ->
+returns runId. save it.
+
+5) poll for results
+
+fetch("https://vjudge.net/solution/data/{{runId}}", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.5",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "sec-gpc": "1",
+    "x-requested-with": "XMLHttpRequest",
+    "cookie": "...",
+    "Referer": "https://vjudge.net/problem/{{PROBLEM_ID}}"
+  },
+  "body": null,
+  "method": "POST"
+});
+
+get -> 
+get status
+
+NOTE:
+
+for this architecture to work, fresh credentials regularly need to be manually updated in backend/frontend
+backend needs a logic to change weights of problems appearing (and resetting them when they appear)
+backend needs to manage testId's. we can have individual weight change mechanism for each user id + test id. 
+but there is no user id management or creation. we can just ask user to name himself something and keep reusing it
+
+weights management can be done by creating table with column:
+user id, problem id, weight
+
+for each problem fetch:
+1) fetch all problems for a user
+2) decide on a problem based on probability
+3) fetch the problem
+4) if user solves it, reset its weight
+5) else increase its weight (more than regular increase)
+6) increase everyone's weight by some amount
+7) send this updated data to database.
+
+maintain a running backend count for test id that the same problem (or topic) is never repeated in a test
+
+DB: csv file
