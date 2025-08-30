@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/avengers2405/CodePractise/backend/app"
+	"github.com/avengers2405/CodePractise/backend/routes"
 )
 
 func main() {
@@ -22,10 +23,12 @@ func main() {
 
 	app.Logger.Println("we are running from the app")
 
-	http.HandleFunc("/health", HealthCheck)
+	// http.HandleFunc("/health", HealthCheck)
+	r := routes.SetupRoutes(app)
 	server := &http.Server{
 		// Addr: ":5000",
 		Addr:         fmt.Sprintf(":%d", port),
+		Handler:      r,
 		IdleTimeout:  5 * time.Second,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: 15 * time.Second,
@@ -35,8 +38,4 @@ func main() {
 	if err != nil {
 		app.Logger.Fatal(err)
 	}
-}
-
-func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Server is running yoohooo\n")
 }
