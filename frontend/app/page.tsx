@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Play, BarChart3, CheckCircle, XCircle, TimerIcon, Loader2 } from "lucide-react"
+import { Play, BarChart3, CheckCircle, XCircle, TimerIcon, Loader2, X } from "lucide-react"
 import { ProblemDisplay } from "@/components/problem-display"
 import { CodeEditor } from "@/components/code-editor"
 import { useTimer } from "@/hooks/use-timer"
-import { nanoid } from 'nanoid' // Add this library for generating IDs
+import { nanoid } from 'nanoid'
 
-// Define problem type for TypeScript
+
 interface Problem {
   id: number
   title: string
@@ -21,6 +21,111 @@ interface Problem {
   constraints: string[]
 }
 
+interface CookieValues {
+  VJ_cf_clearance: string
+  VJ_ext_name: string
+  VJ_JSESSIONID: string
+}
+
+const CookieDialog = ({ 
+  cookieValues, 
+  setCookieValues, 
+  validatingCookies, 
+  cookieError, 
+  onSubmit 
+}: {
+  cookieValues: CookieValues
+  setCookieValues: React.Dispatch<React.SetStateAction<CookieValues>>
+  validatingCookies: boolean
+  cookieError: string
+  onSubmit: () => void
+}) => {
+  // Use useCallback to prevent function recreation
+  const handleCfClearanceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCookieValues(prev => ({...prev, VJ_cf_clearance: e.target.value}))
+  }, [setCookieValues])
+
+  const handleExtNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCookieValues(prev => ({...prev, VJ_ext_name: e.target.value}))
+  }, [setCookieValues])
+
+  const handleJSessionIdChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCookieValues(prev => ({...prev, VJ_JSESSIONID: e.target.value}))
+  }, [setCookieValues])
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg border shadow-lg max-w-md w-full p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">VJudge Cookie Configuration</h2>
+        </div>
+        
+        <p className="text-sm text-muted-foreground mb-6">
+          Please enter your VJudge cookies to continue. You can find these in your browser's developer tools.
+        </p>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">VJ_cf_clearance</label>
+            <input
+              type="text"
+              value={cookieValues.VJ_cf_clearance}
+              onChange={handleCfClearanceChange}
+              className="w-full p-2 border rounded-md bg-background text-foreground"
+              placeholder="Enter VJ_cf_clearance value"
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-2 block">VJ_ext_name</label>
+            <input
+              type="text"
+              value={cookieValues.VJ_ext_name}
+              onChange={handleExtNameChange}
+              className="w-full p-2 border rounded-md bg-background text-foreground"
+              placeholder="Enter VJ_ext_name value"
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-2 block">VJ_JSESSIONID</label>
+            <input
+              type="text"
+              value={cookieValues.VJ_JSESSIONID}
+              onChange={handleJSessionIdChange}
+              className="w-full p-2 border rounded-md bg-background text-foreground"
+              placeholder="Enter VJ_JSESSIONID value"
+            />
+          </div>
+        </div>
+        
+        {cookieError && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive">{cookieError}</p>
+          </div>
+        )}
+        
+        <div className="flex gap-3 mt-6">
+          <Button 
+            onClick={onSubmit}
+            disabled={validatingCookies || !cookieValues.VJ_cf_clearance || !cookieValues.VJ_ext_name || !cookieValues.VJ_JSESSIONID}
+            className="flex-1"
+          >
+            {validatingCookies ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              "Submit"
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function HomePage() {
   const [currentView, setCurrentView] = useState<"coding" | "analysis">("coding")
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null)
@@ -29,24 +134,173 @@ export default function HomePage() {
   const [currentCode, setCurrentCode] = useState("")
   const [currentLanguage, setCurrentLanguage] = useState<"cpp" | "python" | "java" | "javascript">("cpp")
   const [solvedCount, setSolvedCount] = useState(0)
-  const [splitRatio, setSplitRatio] = useState(50) // 50% split initially
+  const [splitRatio, setSplitRatio] = useState(50)
   const isDraggingRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [testId, setTestId] = useState<string | null>(null)
   const [testActive, setTestActive] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
 
+  // Cookie validation states
+  const [showCookieDialog, setShowCookieDialog] = useState(false)
+  const [cookiesValid, setCookiesValid] = useState(false)
+  const [cookieValues, setCookieValues] = useState<CookieValues>({
+    VJ_cf_clearance: "",
+    VJ_ext_name: "",
+    VJ_JSESSIONID: ""
+  })
+  const [validatingCookies, setValidatingCookies] = useState(false)
+  const [cookieError, setCookieError] = useState("")
+
   const { currentTime, totalTime, formatTime, resetCurrentTimer } = useTimer()
+
+  // Cookie management functions
+  const getCookie = (name: string): string => {
+    if (typeof document === 'undefined') return ""
+    const value = `; ${document.cookie}`
+    const parts = value.split(`; ${name}=`)
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || ""
+    return ""
+  }
+
+  const setCookie = (name: string, value: string) => {
+    if (typeof document === 'undefined') return
+    document.cookie = `${name}=${value}; path=/; max-age=86400` // 24 hours
+  }
+
+  const validateCookies = async (cookies: CookieValues): Promise<boolean> => {
+    try {
+      const cookieString = `JSESSIONID=${cookies.VJ_JSESSIONID}; ext_name=${cookies.VJ_ext_name}; cf_clearance=${cookies.VJ_cf_clearance}`
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/cookie/validate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ cookieString })
+      })
+      // const response = await fetch("https://vjudge.net/problem/CodeForces-795I", {
+      //   "headers": {
+      //     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      //     "accept-language": "en-US,en;q=0.5",
+      //     "cache-control": "no-cache",
+      //     "pragma": "no-cache",
+      //     "priority": "u=0, i",
+      //     "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
+      //     "sec-ch-ua-mobile": "?0",
+      //     "sec-ch-ua-platform": "\"Windows\"",
+      //     "sec-fetch-dest": "document",
+      //     "sec-fetch-mode": "navigate",
+      //     "sec-fetch-site": "same-origin",
+      //     "sec-fetch-user": "?1",
+      //     "sec-gpc": "1",
+      //     "upgrade-insecure-requests": "1",
+      //     "cookie": cookieString,
+      //     "Referer": "https://vjudge.net/problem"
+      //   },
+      //   "body": null,
+      //   "method": "GET"
+      // })
+
+      const responseText = await response.text()
+      console.log('response: '+responseText)
+      return responseText.includes("avengers2")
+    } catch (error) {
+      console.error("Error validating cookies:", error)
+      return false
+    }
+  }
+
+  const handleCookieSubmit = async () => {
+    setValidatingCookies(true)
+    setCookieError("")
+    
+    try {
+      const isValid = await validateCookies(cookieValues)
+      if (isValid) {
+        // Save cookies
+        setCookie("VJ_cf_clearance", cookieValues.VJ_cf_clearance)
+        setCookie("VJ_ext_name", cookieValues.VJ_ext_name)
+        setCookie("VJ_JSESSIONID", cookieValues.VJ_JSESSIONID)
+        
+        setCookiesValid(true)
+        setShowCookieDialog(false)
+        setCookieError("")
+        
+        // Check for test session after successful validation
+        const storedTestId = localStorage.getItem('test_id')
+        if (storedTestId) {
+          checkTestStatus(storedTestId)
+        } else {
+          setCheckingSession(false)
+        }
+      } else {
+        setCookieError("Invalid cookies. Please check the values and try again.")
+      }
+    } catch (error) {
+      setCookieError("Failed to validate cookies. Please check your network connection.")
+    } finally {
+      setValidatingCookies(false)
+    }
+  }
 
   // Check for existing session on component mount
   useEffect(() => {
-    const storedTestId = localStorage.getItem('test_id')
-    if (storedTestId) {
-      checkTestStatus(storedTestId)
-    } else {
-      setCheckingSession(false)
+    console.log("cookiesValid useEffect vala useEffect runs: "+cookiesValid);
+    const initializeApp = async () => {
+      const vjCfClearance = getCookie("VJ_cf_clearance")
+      const vjExtName = getCookie("VJ_ext_name")
+      const vjJSessionId = getCookie("VJ_JSESSIONID")
+
+      if (vjCfClearance && vjExtName && vjJSessionId) {
+        const cookies = {
+          VJ_cf_clearance: vjCfClearance,
+          VJ_ext_name: vjExtName,
+          VJ_JSESSIONID: vjJSessionId
+        }
+
+        // Set the values first, then validate
+        setCookieValues(cookies)
+        
+        const isValid = await validateCookies(cookies)
+        if (isValid) {
+          setCookiesValid(true)
+          setShowCookieDialog(false)
+          
+          // Check for test session
+          const storedTestId = localStorage.getItem('test_id')
+          if (storedTestId) {
+            checkTestStatus(storedTestId)
+          } else {
+            setCheckingSession(false)
+          }
+        } else {
+          setCookiesValid(false)
+          setShowCookieDialog(true)
+          setCheckingSession(false)
+        }
+      } else {
+        setCookiesValid(false)
+        setShowCookieDialog(true)
+        setCheckingSession(false)
+      }
     }
-  }, [])
+
+    initializeApp()
+  }, []) // Only run once on mount
+
+  // Add a separate useEffect to handle test session checking only when cookies become valid
+  // useEffect(() => {
+  //   console.log("cookiesValid useEffect vala useEffect runs: "+cookiesValid);
+  //   if (cookiesValid) {
+  //     const storedTestId = localStorage.getItem('test_id')
+  //     if (storedTestId) {
+  //       checkTestStatus(storedTestId)
+  //     } else {
+  //       setCheckingSession(false)
+  //     }
+  //   }
+  // }, [cookiesValid])
 
   // Check if test is active with backend
   const checkTestStatus = async (id: string) => {
@@ -223,57 +477,82 @@ export default function HomePage() {
 
   const canViewAnalysis = solvedCount > 0
 
-  if (currentView === "analysis") {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b border-border bg-card">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-6">
-              <h1 className="text-xl font-bold text-foreground">CodePlatform</h1>
-              <nav className="flex gap-4">
-                <Button variant="ghost" onClick={() => setCurrentView("coding")} className="gap-2">
-                  <Play className="h-4 w-4" />
-                  Problems
-                </Button>
-                <Button variant="default" className="gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Analysis
-                </Button>
-              </nav>
-            </div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <TimerIcon className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">Overall</span>
-                <span className="font-medium text-foreground">{formatTime(totalTime)}</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Analysis Dashboard</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-card p-4 rounded-lg border">
-              <h3 className="font-semibold">Problems Solved</h3>
-              <p className="text-2xl font-bold text-primary">{solvedCount}</p>
-            </div>
-            <div className="bg-card p-4 rounded-lg border">
-              <h3 className="font-semibold">Average Time</h3>
-              <p className="text-2xl font-bold text-primary">0:00</p>
-            </div>
-            <div className="bg-card p-4 rounded-lg border">
-              <h3 className="font-semibold">Success Rate</h3>
-              <p className="text-2xl font-bold text-primary">0%</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Cookie Dialog Component
+  // const CookieDialog = () => (
+  //   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  //     <div className="bg-card rounded-lg border shadow-lg max-w-md w-full p-6">
+  //       <div className="flex items-center justify-between mb-4">
+  //         <h2 className="text-xl font-bold">VJudge Cookie Configuration</h2>
+  //         {/* Remove the close button since cookies are required */}
+  //       </div>
+        
+  //       <p className="text-sm text-muted-foreground mb-6">
+  //         Please enter your VJudge cookies to continue. You can find these in your browser's developer tools.
+  //       </p>
+        
+  //       <div className="space-y-4">
+  //         <div>
+  //           <label className="text-sm font-medium mb-2 block">VJ_cf_clearance</label>
+  //           <input
+  //             type="text"
+  //             value={cookieValues.VJ_cf_clearance}
+  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_cf_clearance: e.target.value}))}
+  //             className="w-full p-2 border rounded-md bg-background text-foreground"
+  //             placeholder="Enter VJ_cf_clearance value"
+  //           />
+  //         </div>
+          
+  //         <div>
+  //           <label className="text-sm font-medium mb-2 block">VJ_ext_name</label>
+  //           <input
+  //             type="text"
+  //             value={cookieValues.VJ_ext_name}
+  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_ext_name: e.target.value}))}
+  //             className="w-full p-2 border rounded-md bg-background text-foreground"
+  //             placeholder="Enter VJ_ext_name value"
+  //           />
+  //         </div>
+          
+  //         <div>
+  //           <label className="text-sm font-medium mb-2 block">VJ_JSESSIONID</label>
+  //           <input
+  //             type="text"
+  //             value={cookieValues.VJ_JSESSIONID}
+  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_JSESSIONID: e.target.value}))}
+  //             className="w-full p-2 border rounded-md bg-background text-foreground"
+  //             placeholder="Enter VJ_JSESSIONID value"
+  //           />
+  //         </div>
+  //       </div>
+        
+  //       {cookieError && (
+  //         <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+  //           <p className="text-sm text-destructive">{cookieError}</p>
+  //         </div>
+  //       )}
+        
+  //       <div className="flex gap-3 mt-6">
+  //         <Button 
+  //           onClick={handleCookieSubmit}
+  //           disabled={validatingCookies || !cookieValues.VJ_cf_clearance || !cookieValues.VJ_ext_name || !cookieValues.VJ_JSESSIONID}
+  //           className="flex-1"
+  //         >
+  //           {validatingCookies ? (
+  //             <>
+  //               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+  //               Validating...
+  //             </>
+  //           ) : (
+  //             "Submit"
+  //           )}
+  //         </Button>
+  //       </div>
+  //     </div>
+  //   </div>
+  // )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       <header className="border-b border-border bg-card">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
@@ -507,6 +786,14 @@ export default function HomePage() {
         </div>
       </div>
     )}
+
+    {/* Cookie Dialog Overlay - Always rendered when needed */}
+    {(showCookieDialog || !cookiesValid) && <CookieDialog 
+    cookieValues={cookieValues}
+          setCookieValues={setCookieValues}
+          validatingCookies={validatingCookies}
+          cookieError={cookieError}
+          onSubmit={handleCookieSubmit} />}
     </div>
   )
 }

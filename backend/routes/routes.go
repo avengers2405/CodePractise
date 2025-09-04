@@ -8,6 +8,10 @@ import (
 func SetupRoutes(app *app.Application) *chi.Mux {
 	r := chi.NewRouter()
 
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+        http.NotFound(w, r)
+    })
+
 	r.Get("/health", app.HealthCheck)
 	r.Get("/credential/get", app.CredentialHandler.GetCredentials)
 	r.Get("/credentials/set", app.CredentialHandler.SetCredentials)
