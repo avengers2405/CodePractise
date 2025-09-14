@@ -172,7 +172,7 @@ export default function HomePage() {
     try {
       const cookieString = `JSESSIONID=${cookies.VJ_JSESSIONID}; ext_name=${cookies.VJ_ext_name}; cf_clearance=${cookies.VJ_cf_clearance}`
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/cookie/validate`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/credentials/validate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
