@@ -24,7 +24,7 @@ router.post('/validate', async (req, res) => {
                 "sec-fetch-user": "?1", 
                 "sec-gpc": "1", 
                 "upgrade-insecure-requests": "1", 
-                "cookie": "JSESSIONID=01C619D7B23BF22A984237BE322FDBA6; ext_name=ojplmecpdpgccookcobabopnaifgidhf; cf_clearance=X1USywf6cmmMSWTS7uNihOnihX4.JqWSNyGQLW8pedI-1757784561-1.2.1.1-XSSdRKMfQJYpD3pRxCi_6OZDsxE28xCLaNLdVCgev03kZ1eaA.zb7eqexx5iNT2KdssrWt7nHm_NnhoJbkXArUDbbhty2I29cl9TCtSV.0sxrDqjlE61rc4mKI_XF2j9ClXIzdI1GkX3mDdO_2lQ.o4pRqFR506Onp7JQ85Sl3Q1YiiW4hnEpWHSoLQU0Q2rVoElYtQIrT_FjtJEh7MzbhamUA5glhNyzbc0giUWloA", 
+                "cookie": cookieString, 
                 "Referer": "https://vjudge.net/problem"
             }, 
             "body": null, 
@@ -41,6 +41,7 @@ router.post('/validate', async (req, res) => {
         }
     } catch (e) {
         console.log('Error in function: '+e)
+        res.status(500).send('ise')
     }
 })
 

@@ -152,7 +152,7 @@ export default function HomePage() {
   const [validatingCookies, setValidatingCookies] = useState(false)
   const [cookieError, setCookieError] = useState("")
 
-  const { currentTime, totalTime, formatTime, resetCurrentTimer } = useTimer()
+  const { currentTime, totalTime, formatTime, resetCurrentTimer, startTimers, stopTimers, resetAllTimers } = useTimer()
 
   // Cookie management functions
   const getCookie = (name: string): string => {
@@ -179,28 +179,6 @@ export default function HomePage() {
         },
         body: JSON.stringify({ cookieString })
       })
-      // const response = await fetch("https://vjudge.net/problem/CodeForces-795I", {
-      //   "headers": {
-      //     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-      //     "accept-language": "en-US,en;q=0.5",
-      //     "cache-control": "no-cache",
-      //     "pragma": "no-cache",
-      //     "priority": "u=0, i",
-      //     "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Brave\";v=\"139\", \"Chromium\";v=\"139\"",
-      //     "sec-ch-ua-mobile": "?0",
-      //     "sec-ch-ua-platform": "\"Windows\"",
-      //     "sec-fetch-dest": "document",
-      //     "sec-fetch-mode": "navigate",
-      //     "sec-fetch-site": "same-origin",
-      //     "sec-fetch-user": "?1",
-      //     "sec-gpc": "1",
-      //     "upgrade-insecure-requests": "1",
-      //     "cookie": cookieString,
-      //     "Referer": "https://vjudge.net/problem"
-      //   },
-      //   "body": null,
-      //   "method": "GET"
-      // })
 
       const responseText = await response.text()
       console.log('response: '+responseText)
@@ -306,7 +284,7 @@ export default function HomePage() {
   const checkTestStatus = async (id: string) => {
     try {
       setCheckingSession(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/test/status/${id}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/test/validate_id/${id}`)
       
       if (!response.ok) {
         throw new Error("Failed to check test status")
@@ -340,28 +318,25 @@ export default function HomePage() {
   const startNewTest = async () => {
     try {
       setIsLoading(true)
-      const newTestId = nanoid(10) // Generate a random test ID
       
-      // Validate test ID with backend
+      // Hit backend with GET request to get a new testId
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/test/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ testId: newTestId }),
+        method: 'GET',
       })
       
       if (!response.ok) {
         throw new Error("Failed to start new test")
       }
+
+      const res = await response.json();
       
       // Store test ID in localStorage
-      localStorage.setItem('test_id', newTestId)
-      setTestId(newTestId)
+      localStorage.setItem('test_id', res.testid)
+      setTestId(res.testid)
       setTestActive(true)
       
-      // Fetch first problem
-      fetchCurrentProblem(newTestId)
+      // Fetch first problem (timer will start when problem loads)
+      fetchCurrentProblem(res.testid)
     } catch (error) {
       console.error("Error starting new test:", error)
       setTestId(null)
@@ -386,7 +361,14 @@ export default function HomePage() {
       setCurrentProblem(problem)
       setCurrentCode("")  // Clear the code editor
       setSubmissionResult(null)  // Reset submission status
-      resetCurrentTimer()  // Reset the timer for this problem
+      
+      // Start timers only when the first problem appears
+      if (!currentProblem) {
+        startTimers()  // Start both global and per-problem timers
+      } else {
+        resetCurrentTimer()  // Reset only current timer for subsequent problems
+      }
+      
     } catch (error) {
       console.error("Error fetching problem:", error)
       setCurrentProblem(null)
@@ -468,6 +450,10 @@ export default function HomePage() {
   }
 
   const endTest = () => {
+    // Stop and reset all timers
+    stopTimers()
+    resetAllTimers()
+    
     // Clear test session
     localStorage.removeItem('test_id')
     setTestId(null)
@@ -476,81 +462,6 @@ export default function HomePage() {
   }
 
   const canViewAnalysis = solvedCount > 0
-
-  // Cookie Dialog Component
-  // const CookieDialog = () => (
-  //   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  //     <div className="bg-card rounded-lg border shadow-lg max-w-md w-full p-6">
-  //       <div className="flex items-center justify-between mb-4">
-  //         <h2 className="text-xl font-bold">VJudge Cookie Configuration</h2>
-  //         {/* Remove the close button since cookies are required */}
-  //       </div>
-        
-  //       <p className="text-sm text-muted-foreground mb-6">
-  //         Please enter your VJudge cookies to continue. You can find these in your browser's developer tools.
-  //       </p>
-        
-  //       <div className="space-y-4">
-  //         <div>
-  //           <label className="text-sm font-medium mb-2 block">VJ_cf_clearance</label>
-  //           <input
-  //             type="text"
-  //             value={cookieValues.VJ_cf_clearance}
-  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_cf_clearance: e.target.value}))}
-  //             className="w-full p-2 border rounded-md bg-background text-foreground"
-  //             placeholder="Enter VJ_cf_clearance value"
-  //           />
-  //         </div>
-          
-  //         <div>
-  //           <label className="text-sm font-medium mb-2 block">VJ_ext_name</label>
-  //           <input
-  //             type="text"
-  //             value={cookieValues.VJ_ext_name}
-  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_ext_name: e.target.value}))}
-  //             className="w-full p-2 border rounded-md bg-background text-foreground"
-  //             placeholder="Enter VJ_ext_name value"
-  //           />
-  //         </div>
-          
-  //         <div>
-  //           <label className="text-sm font-medium mb-2 block">VJ_JSESSIONID</label>
-  //           <input
-  //             type="text"
-  //             value={cookieValues.VJ_JSESSIONID}
-  //             onChange={(e) => setCookieValues(prev => ({...prev, VJ_JSESSIONID: e.target.value}))}
-  //             className="w-full p-2 border rounded-md bg-background text-foreground"
-  //             placeholder="Enter VJ_JSESSIONID value"
-  //           />
-  //         </div>
-  //       </div>
-        
-  //       {cookieError && (
-  //         <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-  //           <p className="text-sm text-destructive">{cookieError}</p>
-  //         </div>
-  //       )}
-        
-  //       <div className="flex gap-3 mt-6">
-  //         <Button 
-  //           onClick={handleCookieSubmit}
-  //           disabled={validatingCookies || !cookieValues.VJ_cf_clearance || !cookieValues.VJ_ext_name || !cookieValues.VJ_JSESSIONID}
-  //           className="flex-1"
-  //         >
-  //           {validatingCookies ? (
-  //             <>
-  //               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-  //               Validating...
-  //             </>
-  //           ) : (
-  //             "Submit"
-  //           )}
-  //         </Button>
-  //       </div>
-  //     </div>
-  //   </div>
-  // )
-
   return (
     <div className="min-h-screen bg-background relative">
       <header className="border-b border-border bg-card">
